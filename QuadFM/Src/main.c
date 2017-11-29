@@ -3,41 +3,52 @@
   * File Name          : main.c
   * Description        : Main program body
   ******************************************************************************
-  ** This notice applies to any and all portions of this file
+  * This notice applies to any and all portions of this file
   * that are not between comment pairs USER CODE BEGIN and
   * USER CODE END. Other portions of this file, whether 
   * inserted by the user or by software development tools
   * are owned by their respective copyright owners.
   *
-  * COPYRIGHT(c) 2017 STMicroelectronics
+  * Copyright (c) 2017 STMicroelectronics International N.V. 
+  * All rights reserved.
   *
-  * Redistribution and use in source and binary forms, with or without modification,
-  * are permitted provided that the following conditions are met:
-  *   1. Redistributions of source code must retain the above copyright notice,
-  *      this list of conditions and the following disclaimer.
-  *   2. Redistributions in binary form must reproduce the above copyright notice,
-  *      this list of conditions and the following disclaimer in the documentation
-  *      and/or other materials provided with the distribution.
-  *   3. Neither the name of STMicroelectronics nor the names of its contributors
-  *      may be used to endorse or promote products derived from this software
-  *      without specific prior written permission.
+  * Redistribution and use in source and binary forms, with or without 
+  * modification, are permitted, provided that the following conditions are met:
   *
-  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  * 1. Redistribution of source code must retain the above copyright notice, 
+  *    this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright notice,
+  *    this list of conditions and the following disclaimer in the documentation
+  *    and/or other materials provided with the distribution.
+  * 3. Neither the name of STMicroelectronics nor the names of other 
+  *    contributors to this software may be used to endorse or promote products 
+  *    derived from this software without specific written permission.
+  * 4. This software, including modifications and/or derivative works of this 
+  *    software, must execute solely and exclusively on microcontroller or
+  *    microprocessor devices manufactured by or for STMicroelectronics.
+  * 5. Redistribution and use of this software other than as permitted under 
+  *    this license is void and will automatically terminate your rights under 
+  *    this license. 
+  *
+  * THIS SOFTWARE IS PROVIDED BY STMICROELECTRONICS AND CONTRIBUTORS "AS IS" 
+  * AND ANY EXPRESS, IMPLIED OR STATUTORY WARRANTIES, INCLUDING, BUT NOT 
+  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+  * PARTICULAR PURPOSE AND NON-INFRINGEMENT OF THIRD PARTY INTELLECTUAL PROPERTY
+  * RIGHTS ARE DISCLAIMED TO THE FULLEST EXTENT PERMITTED BY LAW. IN NO EVENT 
+  * SHALL STMICROELECTRONICS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
+  * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
+  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   *
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f4xx_hal.h"
+#include "usb_host.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -56,10 +67,6 @@ SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi4;
 SPI_HandleTypeDef hspi5;
 
-TIM_HandleTypeDef htim3;
-
-PCD_HandleTypeDef hpcd_USB_OTG_HS;
-
 SDRAM_HandleTypeDef hsdram1;
 
 /* USER CODE BEGIN PV */
@@ -74,14 +81,10 @@ static void MX_DMA_Init(void);
 static void MX_ADC3_Init(void);
 static void MX_FMC_Init(void);
 static void MX_SPI5_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI4_Init(void);
-static void MX_USB_OTG_HS_PCD_Init(void);
-
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-                                
+void MX_USB_HOST_Process(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -121,11 +124,10 @@ int main(void)
   MX_ADC3_Init();
   MX_FMC_Init();
   MX_SPI5_Init();
-  MX_TIM3_Init();
   MX_ADC1_Init();
   MX_SPI1_Init();
   MX_SPI4_Init();
-  MX_USB_OTG_HS_PCD_Init();
+  MX_USB_HOST_Init();
 
   /* USER CODE BEGIN 2 */
 	TLC5971_init(&hspi5);
@@ -152,22 +154,24 @@ int main(void)
 	
 	TLC5971_Settings(REG_DSRPT);
 	TLC5971_Update();
+	
+//	HAL_GPIO_WritePin(USB_H_PWR_EN_GPIO_Port, USB_H_PWR_EN_Pin, GPIO_PIN_RESET);
+	
   /* USER CODE END 2 */
 
-		
-		
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
 		uint32_t delay = 1000000;
 		while(--delay){}
+			
+		HAL_Toggles_Scan();
 		
 	
   /* USER CODE END WHILE */
-		
-		
-		
+    MX_USB_HOST_Process();
+
   /* USER CODE BEGIN 3 */
 		
   }
@@ -374,6 +378,7 @@ static void MX_SPI4_Init(void)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
+
 }
 
 /* SPI5 init function */
@@ -382,76 +387,17 @@ static void MX_SPI5_Init(void)
 
   hspi5.Instance = SPI5;
   hspi5.Init.Mode = SPI_MODE_MASTER;
-  hspi5.Init.Direction = SPI_DIRECTION_1LINE;
+  hspi5.Init.Direction = SPI_DIRECTION_2LINES;
   hspi5.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi5.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi5.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi5.Init.NSS = SPI_NSS_SOFT;
-  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+  hspi5.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi5.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi5.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi5.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi5.Init.CRCPolynomial = 10;
   if (HAL_SPI_Init(&hspi5) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-}
-
-/* TIM3 init function */
-static void MX_TIM3_Init(void)
-{
-
-  TIM_MasterConfigTypeDef sMasterConfig;
-  TIM_OC_InitTypeDef sConfigOC;
-
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 100;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 1000;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 1000;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-  HAL_TIM_MspPostInit(&htim3);
-
-}
-
-/* USB_OTG_HS init function */
-static void MX_USB_OTG_HS_PCD_Init(void)
-{
-
-  hpcd_USB_OTG_HS.Instance = USB_OTG_HS;
-  hpcd_USB_OTG_HS.Init.dev_endpoints = 6;
-  hpcd_USB_OTG_HS.Init.speed = PCD_SPEED_FULL;
-  hpcd_USB_OTG_HS.Init.dma_enable = DISABLE;
-  hpcd_USB_OTG_HS.Init.ep0_mps = DEP0CTL_MPS_64;
-  hpcd_USB_OTG_HS.Init.phy_itface = USB_OTG_EMBEDDED_PHY;
-  hpcd_USB_OTG_HS.Init.Sof_enable = DISABLE;
-  hpcd_USB_OTG_HS.Init.low_power_enable = DISABLE;
-  hpcd_USB_OTG_HS.Init.lpm_enable = DISABLE;
-  hpcd_USB_OTG_HS.Init.vbus_sensing_enable = DISABLE;
-  hpcd_USB_OTG_HS.Init.use_dedicated_ep1 = DISABLE;
-  hpcd_USB_OTG_HS.Init.use_external_vbus = DISABLE;
-  if (HAL_PCD_Init(&hpcd_USB_OTG_HS) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -516,7 +462,6 @@ static void MX_FMC_Init(void)
         * Output
         * EVENT_OUT
         * EXTI
-     PA1   ------> SharedAnalog_PA1
 */
 static void MX_GPIO_Init(void)
 {
@@ -539,6 +484,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, CS_nCS_Pin|CS_nRST_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(USB_H_PWR_EN_GPIO_Port, USB_H_PWR_EN_Pin, GPIO_PIN_SET);
+
   /*Configure GPIO pins : EXTSPI_nCS_Pin FLASH_HOLD_Pin FLASH_nCS_Pin */
   GPIO_InitStruct.Pin = EXTSPI_nCS_Pin|FLASH_HOLD_Pin|FLASH_nCS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -546,23 +494,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : ADC6_Pin */
-  GPIO_InitStruct.Pin = ADC6_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(ADC6_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : SW4_Pin */
-  GPIO_InitStruct.Pin = SW4_Pin;
+  /*Configure GPIO pins : SW1_L_Pin SW5_H_Pin USB_H_ID_Pin SW5_L_Pin */
+  GPIO_InitStruct.Pin = SW1_L_Pin|SW5_H_Pin|USB_H_ID_Pin|SW5_L_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(SW4_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : GP7_Pin */
-  GPIO_InitStruct.Pin = GP7_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GP7_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pins : SW6_L_Pin SW6_H_Pin SW3_H_Pin SW3_L_Pin */
+  GPIO_InitStruct.Pin = SW6_L_Pin|SW6_H_Pin|SW3_H_Pin|SW3_L_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : CS_nCS_Pin CS_nRST_Pin */
   GPIO_InitStruct.Pin = CS_nCS_Pin|CS_nRST_Pin;
@@ -571,21 +513,34 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SW3_Pin SW5_Pin */
-  GPIO_InitStruct.Pin = SW3_Pin|SW5_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pin : USB_H_PWR_FAULT_Pin */
+  GPIO_InitStruct.Pin = USB_H_PWR_FAULT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(USB_H_PWR_FAULT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : USB_H_PWR_EN_Pin */
+  GPIO_InitStruct.Pin = USB_H_PWR_EN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(USB_H_PWR_EN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SW1_H_Pin SW2_H_Pin */
+  GPIO_InitStruct.Pin = SW1_H_Pin|SW2_H_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SW4_H_Pin SW4_L_Pin SW2_L_Pin */
+  GPIO_InitStruct.Pin = SW4_H_Pin|SW4_L_Pin|SW2_L_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SW2_Pin SW1_Pin */
-  GPIO_InitStruct.Pin = SW2_Pin|SW1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI2_IRQn, 10, 0);
-  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
 

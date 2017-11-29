@@ -76,12 +76,9 @@ void TLC5971_Settings (unsigned char value)
 	rgTxBuffer[0]	 = (value>>3);
 }
 void TLC5971_Update(void)
-{
-//	uint32_t delay = 500;
-		
+{		
 	rgTxBuffer[0] = (0x25<<2);	// Add write byte to start
 	HAL_SPI_Transmit(TLC5971_SPIConfig, rgTxBuffer, sizeof rgTxBuffer, 100);
-//	while(--delay){}
 }
 
 //_____ Initialisaion _________________________________________________________________________________________________

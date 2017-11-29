@@ -7,11 +7,10 @@
 
 #include "stm32f4xx_hal.h"
 
-#define SWL1_OUT(pinstate)  HAL_GPIO_WritePin(SW1_GPIO_Port, SW1_Pin, pinstate)
-#define SWL2_OUT(pinstate)  HAL_GPIO_WritePin(SW2_GPIO_Port, SW2_Pin, pinstate)
-#define SWL3_OUT(pinstate)  HAL_GPIO_WritePin(SW3_GPIO_Port, SW3_Pin, pinstate)
-#define SWL4_OUT(pinstate)  HAL_GPIO_WritePin(SW4_GPIO_Port, SW4_Pin, pinstate)
-#define SWL5_OUT(pinstate)  HAL_GPIO_WritePin(SW5_GPIO_Port, SW5_Pin, pinstate)
+
+		
+		
+		
 		
 void HAL_Toggles_reset(void);
 uint16_t HAL_Toggles_read(void);
