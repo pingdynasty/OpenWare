@@ -11,7 +11,7 @@
 #endif
 
 #define OWL_PEDAL_HARDWARE          0x11
-#define OWL_MODULAR_HARDWARE        0x12
+#define OWL_MODULAR_LEGACY_HARDWARE 0x12
 #define OWL_RACK_HARDWARE           0x13
 #define PRISM_HARDWARE              0x14
 #define PLAYER_HARDWARE             0x15
@@ -25,6 +25,7 @@
 #define BIOSIGNALS_HARDWARE         0x1d
 #define LICH_HARDWARE               0x1e
 #define WITCH_HARDWARE              0x1f
+#define OWL_MODULAR_HARDWARE        0x20 /* This is not a new device, but a way to distinguish firmware */
 
 #define PROGRAM_VECTOR_CHECKSUM_V11 0x40
 #define PROGRAM_VECTOR_CHECKSUM_V12 0x50
