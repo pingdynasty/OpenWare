@@ -1,26 +1,17 @@
 #include <stdlib.h>
-#include "stm32f1xx_hal.h"
+#include "device.h"
 #include "HAL_TLC5946.h"
 #include "bus.h"
 #include "gpio.h"
 #include "clock.h"
 #include "message.h"
 #include "OpenWareMidiControl.h"
-#include "device.h"
 #include "basicmaths.h"
 #include "SmoothValue.h"
 
-// #define USE_PIXI
-// #define USE_MAX
-#define USE_MAX_DMA
-#define TLC_CONTINUOUS
-// #define MAX_CONTINUOUS
-
-#ifdef USE_PIXI
-#include "Pixi.h"
-Pixi pixi;
-#elif defined USE_MAX || defined USE_MAX_DMA
+#if defined USE_MAX || defined USE_MAX_DMA
 #include "HAL_MAX11300.h"
+extern SPI_HandleTypeDef MAX11300_SPI;
 #endif
 
 /**
@@ -28,10 +19,9 @@ Pixi pixi;
  * LED channel index is the inverse of MAX channel index.
  */
 
-#define USE_TLC
-
 extern "C" {
 #ifdef USE_TLC
+  extern SPI_HandleTypeDef TLC5946_SPI;
 #endif
   void setup(void);
   void run(void);
@@ -52,7 +42,7 @@ enum ChannelMode {
   CHANNEL_MODES
 };
 
-#define TLC5940_CHANNELS 20
+#define TLC5940_CHANNELS 16
 #define MAX11300_CHANNELS 20
 
 uint8_t cc_values[MAX11300_CHANNELS] = {0};
@@ -72,6 +62,9 @@ void setADC(uint8_t ch, int16_t value);
 uint8_t getChannelIndex(uint8_t ch);
 
 void setup(){
+  MAX11300_init(&MAX11300_SPI);
+  TLC5946_init(&TLC5946_SPI);
+
   // setPin(TLC_BLANK_GPIO_Port, TLC_BLANK_Pin); // bring BLANK high to turn LEDs off
 
   for(int ch=0; ch<MAX11300_CHANNELS; ++ch){
@@ -109,9 +102,7 @@ void setup(){
     HAL_Delay(delayms);
   }
 
-#ifdef USE_PIXI
-  pixi.begin();
-#elif defined USE_MAX || defined  USE_MAX_DMA
+#if defined USE_MAX || defined  USE_MAX_DMA
   MAX11300_setDeviceControl(DCR_DACCTL_ImmUpdate|DCR_DACREF_Int|DCR_ADCCTL_ContSweep/*|DCR_BRST_Contextual*/);
 #endif
 #if defined USE_MAX_DMA && defined MAX_CONTINUOUS
@@ -121,20 +112,7 @@ void setup(){
 
 void configureChannel(uint8_t ch, ChannelMode mode){
   switch(mode){
-#ifdef USE_PIXI
-  case ADC_5TO5:
-    pixi.configChannel(CHANNEL_0+ch, CH_MODE_ADC_P, 0, CH_5N_TO_5P, ADC_MODE_CONT);
-    break;
-  case ADC_0TO10:
-    pixi.configChannel(CHANNEL_0+ch, CH_MODE_ADC_P, 0, CH_0_TO_10P, ADC_MODE_CONT);
-    break;
-  case DAC_5TO5:
-    pixi.configChannel(CHANNEL_0+ch, CH_MODE_DAC, 0, CH_5N_TO_5P, 0);
-    break;
-  case DAC_0TO10:
-    pixi.configChannel(CHANNEL_0+ch, CH_MODE_DAC, 0, CH_0_TO_10P, 0);
-    break;
-#elif defined USE_MAX || defined USE_MAX_DMA
+#if defined USE_MAX || defined USE_MAX_DMA
   case ADC_5TO5:
     MAX11300_setPortMode(PORT_1+ch, PCR_Range_ADC_M5_P5|PCR_Mode_ADC_SgEn_PosIn|PCR_ADCSamples_16|PCR_ADCref_INT);
     break;
@@ -173,9 +151,9 @@ void setDAC(uint8_t ch, int16_t value){
     if(cfg[ch] < DAC_MODE){
       // auto configure to output
       if(value < 0){
-	configureChannel(ch, DAC_5TO5);
+        configureChannel(ch, DAC_5TO5);
       }else{
-	configureChannel(ch, DAC_0TO10);
+        configureChannel(ch, DAC_0TO10);
       }
     }
     if(cfg[ch] == DAC_5TO5)
@@ -204,9 +182,7 @@ uint8_t getChannelIndex(uint8_t ch){
 }
 
 uint16_t getPortValue(uint8_t ch){
-#ifdef USE_PIXI
-  return pixi.readAnalog(ch);
-#elif defined USE_MAX
+#if defined USE_MAX
   return MAX11300_readADC(ch);
 #elif defined USE_MAX_DMA
   return MAX11300_getADCValue(ch);
@@ -214,9 +190,7 @@ uint16_t getPortValue(uint8_t ch){
 }
 
 void setPortValue(uint8_t ch, uint16_t value){
-#ifdef USE_PIXI
-  pixi.writeAnalog(ch, value);
-#elif defined USE_MAX
+#if defined USE_MAX
   MAX11300_setDAC(ch, value);
 #elif defined USE_MAX_DMA
   MAX11300_setDACValue(ch, value);
@@ -233,8 +207,8 @@ void loop(){
       setADC(ch, getPortValue(ch));
       uint8_t cc = adc[ch] >> 5;
       if(abs(cc - cc_values[ch]) > HYSTERESIS_DELTA){
-	bus_tx_parameter(getChannelIndex(PARAMETER_AA+ch), adc[ch]);
-	cc_values[ch] = cc;
+        bus_tx_parameter(getChannelIndex(PARAMETER_AA+ch), adc[ch]);
+        cc_values[ch] = cc;
       }
     }
   }

@@ -1,6 +1,6 @@
 # name of executable
-ELF=$(BUILD)/Expander.elf                    
-BIN=$(BUILD)/Expander.bin
+ELF=$(BUILD)/$(PROJECT).elf
+BIN=$(BUILD)/$(PROJECT).bin
 
 # Tool path
 TOOLROOT ?= ~/bin/gcc-arm-none-eabi-9-2020-q2-update/bin/
@@ -18,21 +18,12 @@ OBJDUMP=$(TOOLROOT)/arm-none-eabi-objdump
 SIZE=$(TOOLROOT)/arm-none-eabi-size
 
 # Set up search path
-vpath %.cpp $(TEMPLATEROOT)/Source
-vpath %.c $(TEMPLATEROOT)/Source
-vpath %.s $(TEMPLATEROOT)/Source
-vpath %.cpp $(TEMPLATEROOT)/MDK-ARM
-vpath %.c $(TEMPLATEROOT)/MDK-ARM
-vpath %.s $(TEMPLATEROOT)/MDK-ARM
-vpath %.cpp $(TEMPLATEROOT)/Src
-vpath %.c $(TEMPLATEROOT)/Src
-vpath %.s $(TEMPLATEROOT)/Src
-vpath %.c $(TEMPLATEROOT)/Libraries/syscalls
-vpath %.c $(PERIPH_FILE)/src
-vpath %.c $(PERIPH_FILE)/inc
-vpath %.c $(DEVICE)
-vpath %.c $(USB_DEVICE_FILE)/Core/src
-vpath %.c $(USB_OTG_FILE)/src/
+OBJS = $(addprefix $(BUILD)/,$(notdir $(C_SRC:.c=.o)))
+vpath %.c $(sort $(dir $(C_SRC)))
+OBJS += $(addprefix $(BUILD)/,$(notdir $(CPP_SRC:.cpp=.o)))
+vpath %.cpp $(sort $(dir $(CPP_SRC)))
+OBJS += $(addprefix $(BUILD)/,$(notdir $(S_SRC:.s=.o)))
+vpath %.s $(sort $(dir $(S_SRC)))
 
 all: bin
 
@@ -66,6 +57,9 @@ clean:
 
 flash:
 	$(OPENOCD) -c "program Build/$(PROJECT).elf verify reset exit"
+
+dump: # flash read_bank num filename [offset [length]]
+	$(OPENOCD) -c "init" -c "halt" -c "flash read_bank 0 dump.bin" -c "exit"
 
 debug: $(ELF)
 	@$(GDB) -ex "target extended-remote localhost:3333" -ex "monitor reset hard" -ex "monitor arm semihosting enable" -ex "load" $(ELF)

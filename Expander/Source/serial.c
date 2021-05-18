@@ -1,9 +1,5 @@
-#include "stm32f1xx_hal.h"
-#include "device.h"
 #include "serial.h"
 #include "device.h"
-
-#include "mxconstants.h"
 
 extern UART_HandleTypeDef huart1;
 

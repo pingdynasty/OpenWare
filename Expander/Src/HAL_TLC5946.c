@@ -1,8 +1,6 @@
-
-#include "stm32f1xx_hal.h"
+#include "device.h"
 #include "HAL_TLC5946.h"
 
-#define TLC_CONTINUOUS
 
 uint8_t rgGSbuf[24] = {0};
 uint8_t rgDCbuf[12] = {255,255,255,255,255,255,255,255,255,255,255,255};
@@ -12,13 +10,13 @@ SPI_HandleTypeDef* TLC5946_SPIConfig;
 void TLC5946_SetOutput_GS (unsigned char LED_ID, unsigned short value)
 {
 	unsigned char temp;
-	unsigned char ucBuffLoc = (unsigned char)(LED_ID*1.5);
+    uint8_t ucBuffLoc = LED_ID + (LED_ID>>1); // (uint8_t)(LED_ID*1.5);
 	
 	if (value < 4095)
 	{
 	  if(LED_ID & 0x01) // bbbbaaaa aaaaaaaa
 		{ 
-			temp									= rgGSbuf[ucBuffLoc]; 
+			temp                  = rgGSbuf[ucBuffLoc]; 
 			rgGSbuf[ucBuffLoc] 	  = (value&0xF00)>>8; 
 			rgGSbuf[ucBuffLoc]   |= (temp&0xF0); 
 			rgGSbuf[ucBuffLoc+1]  = (value&0x0FF); 	
@@ -26,7 +24,7 @@ void TLC5946_SetOutput_GS (unsigned char LED_ID, unsigned short value)
 	  else              // aaaaaaaa aaaabbbb
 		{
 			rgGSbuf[ucBuffLoc] 	  = (value&0xFF0)>>4; 
-			temp 								  = rgGSbuf[ucBuffLoc+1]; 
+			temp                  = rgGSbuf[ucBuffLoc+1]; 
 			rgGSbuf[ucBuffLoc+1]  = (value&0x00F)<<4; 
 			rgGSbuf[ucBuffLoc+1] |= (temp&0x0F);
 		}			

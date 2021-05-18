@@ -5,7 +5,7 @@
 	extern "C" {
 #endif
 
-#include "stm32f1xx_hal.h"
+#include "device.h"
 
 // LED Mapping
 #define LED_1			15

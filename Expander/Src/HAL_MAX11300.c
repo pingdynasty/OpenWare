@@ -1,5 +1,4 @@
-#include "stm32f1xx_hal.h"
-#include "mxconstants.h"
+#include "device.h"
 #include "HAL_MAX11300.h"
 
 #include <string.h>

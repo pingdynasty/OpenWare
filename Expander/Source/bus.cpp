@@ -1,10 +1,9 @@
-#include "stm32f1xx_hal.h"
 #include "bus.h"
 #include "message.h"
 #include "serial.h"
 #include "clock.h"
 #include "DigitalBusStreamReader.h"
-#include "mxconstants.h"
+#include "device.h"
 #include "SerialBuffer.hpp"
 
 static DigitalBusStreamReader bus;
@@ -16,16 +15,6 @@ extern "C" {
   void serial_rx_callback(uint8_t c);
   uint8_t serial_tx_available();
   uint8_t serial_tx_pull();
-
-#define NO_ERROR            0x00
-#define HARDFAULT_ERROR     0x10
-#define BUS_ERROR           0x20
-#define MEM_ERROR           0x30
-#define NMI_ERROR           0x40
-#define USAGE_ERROR         0x50
-#define PROGRAM_ERROR       0x60
-#define CONFIG_ERROR        0x70
-#define UART_ERROR          0x80
 
   void setErrorMessage(int8_t err, const char* msg){
     debug << "Error " << (int)err << ": " << msg << ".";

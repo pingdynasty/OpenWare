@@ -1,15 +1,22 @@
 #include <inttypes.h>
 
-#include "mxconstants.h"
+#include "main.h"
 
 #define FIRMWARE_VERSION             "002"
 #define HARDWARE_VERSION             "Expander Rev01"
 
 #define MIDI_MAX_MESSAGE_SIZE        256
 
+// #define USE_MAX
+#define USE_MAX_DMA
+#define USE_TLC
+#define TLC_CONTINUOUS
+// #define MAX_CONTINUOUS
+
+#define MAX11300_SPI hspi1
+#define TLC5946_SPI hspi2
+
 /**
- * MAX11300 on SPI1
- * TLC5946 on SPI2
  * Digital Bus on USART1
  */
 /* #define USART_BAUDRATE               115200 */
@@ -23,5 +30,5 @@
 #ifdef __cplusplus
 }
 #endif
-#define assert_param(expr) ((expr) ? (void)0 : assert_failed((uint8_t *)__FILE__, __LINE__))
+//#define assert_param(expr) ((expr) ? (void)0 : assert_failed((uint8_t *)__FILE__, __LINE__))
 #endif
