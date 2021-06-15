@@ -119,9 +119,8 @@ inline uint16_t getProgramSelection(){
     prog = 8; // Ignore top dead zone
 
   uint16_t pc = max(bank * 8 + prog, 1);
-  // We must check that patch exists and verify that it's considered valid
-  // to avoid loading from a gap in the patches list
-  if (pc <= registry.getNumberOfPatches() && registry.getPatchDefinition(pc) != NULL)
+  // We must check that patch exists to avoid loading from a gap in the patches list
+  if (registry.hasPatch(pc))
     return pc;
   else
     return 0;

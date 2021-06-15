@@ -16,7 +16,7 @@
 #include "BitState.hpp"
 #include "errorhandlers.h"
 #include "message.h"
-#include "FlashStorage.h"
+#include "Storage.h"
 #include "PatchRegistry.h"
 
 #ifdef OWL_BIOSIGNALS

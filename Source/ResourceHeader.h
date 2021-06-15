@@ -8,9 +8,10 @@
 #endif
 
    struct ResourceHeader {
-     uint32_t magic; // 0xDADADEED
+     uint32_t magic; // 0xDADADEED for resources, 0xDADAC0DE for patches
      uint32_t size;
-     char name[24];
+     char name[20];
+     uint32_t flags;
    };
 
 #ifdef __cplusplus

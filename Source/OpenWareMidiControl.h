@@ -105,6 +105,7 @@ enum OpenWareMidiSysexCommand {
   SYSEX_SETTINGS_RESET            = 0x15,
   SYSEX_SETTINGS_STORE            = 0x16,
   SYSEX_FIRMWARE_SAVE             = 0x17,
+  SYSEX_FIRMWARE_SEND             = 0x18,
   SYSEX_FIRMWARE_VERSION          = 0x20,
   SYSEX_DEVICE_ID                 = 0x21,
   SYSEX_PROGRAM_MESSAGE           = 0x22,

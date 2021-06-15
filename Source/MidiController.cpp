@@ -6,13 +6,18 @@
 #include "MidiStatus.h"
 #include "PatchRegistry.h"
 #include "MidiController.h"
-// #include "Codec.h"
 #include "ApplicationSettings.h"
 #include "ProgramVector.h"
 #include "ProgramManager.h"
-#include "FlashStorage.h"
+#include "Storage.h"
 #include "Owl.h"
 #include "BootloaderStorage.h"
+#include "sysex.h"
+#include "crc32.h"
+
+#ifndef USE_BOOTLOADER_MODE
+#include "cmsis_os.h"
+#endif
 
 void MidiController::sendPatchParameterValues(){
   sendCc(PATCH_PARAMETER_A, (uint8_t)(getParameterValue(PARAMETER_A)>>5) & 0x7f);
@@ -85,7 +90,7 @@ public:
   }
   void loop(){
     if(state < registry.getNumberOfPatches()){
-      midi_tx.sendName(SYSEX_PRESET_NAME_COMMAND, state, registry.getPatchName(state));
+      midi_tx.sendPatchName(state);
       state++;
     }else{
       midi_tx.sendPc(program.getProgramIndex());
@@ -103,8 +108,10 @@ public:
   }
   void loop(){
     if(state < registry.getNumberOfResources()){
-      midi_tx.sendName(SYSEX_RESOURCE_NAME_COMMAND, state,
-		       registry.getResourceName(state+MAX_NUMBER_OF_PATCHES+1));
+      Resource* resource = registry.getResource(state);
+      if(resource)
+	midi_tx.sendName(SYSEX_RESOURCE_NAME_COMMAND, state+MAX_NUMBER_OF_PATCHES,
+			 resource->getName(), resource->getDataSize());
       state++;
     }else{
       owl.setBackgroundTask(NULL); // end this task
@@ -113,7 +120,15 @@ public:
 };
       
 void MidiController::sendPatchName(uint8_t slot){
-  sendName(SYSEX_PRESET_NAME_COMMAND, slot, registry.getPatchName(slot));
+  if(slot == 0){
+    PatchDefinition* def = registry.getPatchDefinition();
+    if(def)
+      sendName(SYSEX_PRESET_NAME_COMMAND, slot, def->getName(), def->getProgramSize());
+  }else{
+    Resource* resource = registry.getPatch(slot-1);
+    if(resource)
+      sendName(SYSEX_PRESET_NAME_COMMAND, slot, resource->getName(), resource->getDataSize());
+  }
 }
 
 void MidiController::sendPatchNames(){
@@ -126,27 +141,63 @@ void MidiController::sendResourceNames(){
   owl.setBackgroundTask(&task);
 }
 
-void MidiController::sendName(uint8_t cmd, uint8_t index, const char* name){
-  if(name != NULL){
-    uint8_t size = strnlen(name, 24);
-    uint8_t buf[size+2];
-    buf[0] = cmd;
-    buf[1] = index;
-    memcpy(buf+2, name, size);
-    sendSysEx(buf, sizeof(buf));
+void MidiController::sendResource(Resource* resource){
+#ifndef USE_BOOTLOADER_MODE
+  const size_t msgsize = 203; // number of resource bytes we send with each SysEx
+  uint8_t data[msgsize];
+  uint8_t msg[msgsize*8/7+6];
+  // prepare and send first message with zero index and resource size
+  size_t len = 0;
+  msg[0] = SYSEX_FIRMWARE_UPLOAD;
+  data_to_sysex((uint8_t*)&len, msg+1, 4);
+  len = __REV(resource->getDataSize());
+  data_to_sysex((uint8_t*)&len, msg+6, 4);
+  sendSysEx(msg, 11);
+  // prepare and send data messages with incrementing index
+  size_t index = 0;
+  size_t offset = 0;
+  len = resource->getDataSize();
+  uint32_t crc = 0;
+  while(offset < len){
+    setProgress(offset*4095/len, "Sending");
+    midi_tx.transmit();
+    vTaskDelay(10);
+    size_t sz = len-offset;
+    if(sz > msgsize)
+      sz = msgsize;
+    storage.readResource(resource, data, offset, sz);
+    offset += sz;
+    crc = crc32(data, sz, crc);
+    index = __REV(__REV(index)+1); // increment and byteswap
+    data_to_sysex((uint8_t*)&index, msg+1, 4);
+    sz = data_to_sysex(data, msg+6, sz);
+    sendSysEx(msg, sz+6);
   }
+  // prepare and send CRC message
+  midi_tx.transmit();
+  vTaskDelay(10);
+  index = __REV(__REV(index)+1);
+  data_to_sysex((uint8_t*)&index, msg+1, 4);
+  crc = __REV(crc);
+  data_to_sysex((uint8_t*)&crc, msg+6, 4);
+  sendSysEx(msg, 11);
+  setProgress(4095, "Sending");
+  program.resetProgram(false);
+#endif
 }
 
-void MidiController::sendPatchParameterNames(){
-  // PatchProcessor* processor = patches.getActivePatchProcessor();
-  // for(int i=0; i<NOF_ADC_VALUES; ++i){
-  //   PatchParameterId pid = (PatchParameterId)i;
-  //   const char* name = processor->getParameterName(pid);
-  //   if(name != NULL)
-  //     sendPatchParameterName(pid, name);
-  //   else
-  //     sendPatchParameterName(pid, "");
-  // }
+void MidiController::sendName(uint8_t cmd, uint8_t index, const char* name, size_t datasize){
+  if(name != NULL){
+    datasize = __REV(datasize); // make it big-endian
+    uint8_t len = strnlen(name, 24);
+    uint8_t buf[len+3+5];
+    buf[0] = cmd;
+    buf[1] = index;
+    memcpy(buf+2, name, len);
+    buf[len+2] = 0;
+    data_to_sysex((uint8_t*)&datasize, buf+len+3, 4);
+    sendSysEx(buf, sizeof(buf));
+  }
 }
 
 void MidiController::sendPatchParameterName(PatchParameterId pid, const char* name){
@@ -186,14 +237,10 @@ void MidiController::sendDeviceStats(){
 #endif /* DEBUG_STACK */
 #ifdef DEBUG_STORAGE
   p = &buf[1];
-  p = stpcpy(p, (const char*)"Storage used ");
-  p = stpcpy(p, msg_itoa(storage.getTotalUsedSize(), 10));
-  p = stpcpy(p, (const char*)" deleted ");
-  p = stpcpy(p, msg_itoa(storage.getDeletedSize(), 10));
-  p = stpcpy(p, (const char*)" free ");
-  p = stpcpy(p, msg_itoa(storage.getFreeSize(), 10));
-  p = stpcpy(p, (const char*)" total ");
-  p = stpcpy(p, msg_itoa(storage.getTotalAllocatedSize(), 10));
+  p = stpcpy(p, (const char*)"Storage ");
+  p = stpcpy(p, msg_itoa(storage.getUsedSize(), 10));
+  p = stpcpy(p, (const char*)"/");
+  p = stpcpy(p, msg_itoa(storage.getTotalCapacity(), 10));
   sendSysEx((uint8_t*)buf, p-buf);
 #endif /* DEBUG_STORAGE */
 #ifdef DEBUG_BOOTLOADER

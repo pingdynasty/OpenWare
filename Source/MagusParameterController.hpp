@@ -8,7 +8,7 @@
 #include "Owl.h"
 #include "OpenWareMidiControl.h"
 #include "PatchRegistry.h"
-#include "FlashStorage.h"
+#include "Storage.h"
 #include "ApplicationSettings.h"
 #include "ProgramManager.h"
 #include "Codec.h"
@@ -290,8 +290,8 @@ public:
     }
 
     // draw flash usage
-    int flash_used = storage.getWrittenSize() / 1024;
-    int flash_total = storage.getTotalAllocatedSize() / 1024;
+    int flash_used = storage.getUsedSize() / 1024;
+    int flash_total = storage.getTotalCapacity() / 1024;
     screen.print(64, offset + 8, "flash ");
     screen.print(flash_used * 100 / flash_total);
     screen.print("%");
@@ -418,23 +418,23 @@ public:
       screen.print(18, 24, "Delete:");
     if (selected > 0 && registry.getNumberOfResources() > 0) {
       screen.setCursor(1, 24);
-      screen.print((int)selected + MAX_NUMBER_OF_PATCHES);
+      screen.print((int)selected);
       screen.print(".");
-      screen.print(registry.getResourceName(MAX_NUMBER_OF_PATCHES + selected));
+      screen.print(registry.getResourceName(selected));
     };
     if (selected < (int)registry.getNumberOfResources()) {
       screen.setCursor(1, 24 + 10);
-      screen.print((int)selected + 1 + MAX_NUMBER_OF_PATCHES);
+      screen.print((int)selected + 1);
       screen.print(".");
-      screen.print(registry.getResourceName(MAX_NUMBER_OF_PATCHES + 1 + selected));
+      screen.print(registry.getResourceName(1 + selected));
     }
     else if (resourceDelete)
       screen.print(18, 24 + 10, "Exit");
     if (selected + 1 < (int)registry.getNumberOfResources()) {
       screen.setCursor(1, 24 + 20);
-      screen.print((int)selected + 2 + MAX_NUMBER_OF_PATCHES);
+      screen.print((int)selected + 2);
       screen.print(".");
-      screen.print(registry.getResourceName(MAX_NUMBER_OF_PATCHES + 2 + selected));
+      screen.print(registry.getResourceName(2 + selected));
     }
     if (resourceDelete)
       screen.drawRectangle(0, 25, 128, 10, WHITE);
@@ -736,13 +736,13 @@ public:
           else if (!resourceDeletePressed) {
             // Delete resource unless it's protected by "__" prefix
             resourceDeletePressed = true;
-            ResourceHeader* res = registry.getResource(selectedPid[1] + MAX_NUMBER_OF_PATCHES + 1);
+            Resource* res = registry.getResource(selectedPid[1]);
             if (res != NULL) {
-              if(res->name[0] == '_' && res->name[1] == '_'){
+              if(res->getName()[0] == '_' && res->getName()[1] == '_'){
                 debugMessage("Resource protected");
               }
               else {
-                registry.setDeleted(selectedPid[1] + MAX_NUMBER_OF_PATCHES + 1);
+		storage.eraseResource(res);
               }
             }
           }

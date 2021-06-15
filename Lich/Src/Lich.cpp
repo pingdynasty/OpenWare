@@ -151,7 +151,8 @@ void setup(){
 
 #define PATCH_RESET_COUNTER (4000/MAIN_LOOP_SLEEP_MS)
 
-void setProgress(uint16_t value){
+void setProgress(uint16_t value, const char* msg){
+  debugMessage(msg, (int)(100*value/4095));
   progress = value;
 }
 

@@ -48,19 +48,17 @@ void onResourceUpdate(void){
   extern const uint32_t rainbowoutputs[];
   extern const uint32_t* dyn_rainbowinputs;
   extern const uint32_t* dyn_rainbowoutputs;
-  ResourceHeader* res = registry.getResource("Rainbow.in");
-  if (res == NULL){
+  Resource* res = storage.getResourceByName("Rainbow.in");
+  if(res && res->isMemoryMapped()){
+    dyn_rainbowinputs = (uint32_t*)res->getData();
+  }else{
     dyn_rainbowinputs = rainbowinputs;
   }
-  else {
-    dyn_rainbowinputs = (uint32_t*)registry.getData(res);
-  }
-  res = registry.getResource("Rainbow.out");
-  if (res == NULL){
+  res = storage.getResourceByName("Rainbow.out");
+  if(res && res->isMemoryMapped()){
+    dyn_rainbowoutputs = (uint32_t*)res->getData();
+  }else{
     dyn_rainbowoutputs = rainbowoutputs;
-  }
-  else {
-    dyn_rainbowoutputs = (uint32_t*)registry.getData(res);
   }
 }
 

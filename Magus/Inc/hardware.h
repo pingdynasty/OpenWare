@@ -5,6 +5,8 @@
 #define HARDWARE_ID                  MAGUS_HARDWARE
 #define HARDWARE_VERSION             "Magus"
 
+#define USE_SPI_FLASH
+
 #define USE_SCREEN
 #define SSD1309
 /* #define OLED_DMA */

@@ -68,14 +68,14 @@ void usbd_audio_tx_start_callback(uint16_t rate, uint8_t channels){
   pos = (pos + len/2) % len;
   pos = (pos/AUDIO_CHANNELS)*AUDIO_CHANNELS; // round down to nearest frame
   audio_tx_buffer.setReadIndex(pos);
-#if DEBUG
+#ifdef DEBUG
   printf("start tx %d %d %d\n", rate, channels, pos);
 #endif
 #endif
 }
 
 void usbd_audio_tx_stop_callback(){
-#if DEBUG
+#ifdef DEBUG
   printf("stop tx\n");
 #endif
 }
@@ -91,7 +91,7 @@ void usbd_audio_rx_start_callback(uint16_t rate, uint8_t channels){
   audio_rx_buffer.setWriteIndex(pos);
   program.exitProgram(true);
   owl.setOperationMode(STREAM_MODE);
-#if DEBUG
+#ifdef DEBUG
   printf("start rx %d %d %d\n", rate, channels, pos);
 #endif
 #endif
@@ -103,7 +103,7 @@ void usbd_audio_rx_stop_callback(){
   program.loadProgram(program.getProgramIndex());
   program.startProgram(true);
   owl.setOperationMode(RUN_MODE);
-#if DEBUG
+#ifdef DEBUG
   printf("stop rx\n");
 #endif
 #endif  

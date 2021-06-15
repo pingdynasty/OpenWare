@@ -7,12 +7,13 @@
 #include "ApplicationSettings.h"
 #include "errorhandlers.h"
 #include "VersionToken.h"
+#include "ProgramHeader.h"
+#include "PatchRegistry.h"
 #ifdef USE_CODEC
 #include "Codec.h"
 #endif
 #include "Owl.h"
-#include "FlashStorage.h"
-#include "PatchRegistry.h"
+#include "Storage.h"
 #ifndef USE_BOOTLOADER_MODE
 #include "BootloaderStorage.h"
 #endif
@@ -111,9 +112,6 @@ void MidiHandler::handleControlChange(uint8_t status, uint8_t cc, uint8_t value)
       break;
     case SYSEX_PRESET_NAME_COMMAND:
       midi_tx.sendPatchNames();
-      break;
-    case SYSEX_PARAMETER_NAME_COMMAND:
-      midi_tx.sendPatchParameterNames();
       break;
     case SYSEX_CONFIGURATION_COMMAND:
       midi_tx.sendSettings();
@@ -245,7 +243,7 @@ void MidiHandler::handleFirmwareUploadCommand(uint8_t* data, uint16_t size){
   int32_t ret = loader.handleFirmwareUpload(data, size);
   if(ret == 0){
     owl.setOperationMode(LOAD_MODE);
-    setParameterValue(LOAD_INDICATOR_PARAMETER, loader.index*4095/loader.size);
+    setProgress(loader.index*4095/loader.size, "Loading");
   }
 }
 
@@ -255,7 +253,6 @@ void MidiHandler::handleFirmwareRunCommand(uint8_t* data, uint16_t size){
 
 void MidiHandler::runProgram(){
   if(loader.isReady()){
-    // program.exitProgram(true); // exit progress bar
     program.loadDynamicProgram(loader.getData(), loader.getSize());
     loader.clear();
     // program.startProgram(true);
@@ -305,18 +302,44 @@ void MidiHandler::handleFirmwareFlashCommand(uint8_t* data, uint16_t size){
   }
 }
 
+void MidiHandler::handleFirmwareSendCommand(uint8_t* data, uint16_t size){
+  uint32_t slot = loader.decodeInt(data);
+  Resource* resource = NULL;
+  if(slot-1 < MAX_NUMBER_OF_PATCHES)
+    resource = registry.getPatch(slot-1);
+  else if(slot-MAX_NUMBER_OF_PATCHES < MAX_NUMBER_OF_RESOURCES)
+    resource = registry.getResource(slot-MAX_NUMBER_OF_PATCHES);
+  if(resource != NULL)
+    program.sendResource(resource);
+  else
+    error(PROGRAM_ERROR, "Invalid SEND command");
+}
+
 void MidiHandler::handleFirmwareStoreCommand(uint8_t* data, uint16_t size){
   if(loader.isReady() && size == 5){
     uint32_t slot = loader.decodeInt(data);
-    if(slot > 0 && slot <= MAX_NUMBER_OF_PATCHES+MAX_NUMBER_OF_RESOURCES){
-      program.saveToFlash(slot, loader.getData(), loader.getSize());
-      loader.clear();
+    if(slot > 0 && slot <= MAX_NUMBER_OF_PATCHES){
+      data = loader.getData();
+      size_t datasize = loader.getSize();
+      // char name[] = "patch00";
+      // name[5] = '0'+((slot*10)%10);
+      // name[6] = '0'+(slot%10);
+      memmove(data+sizeof(ResourceHeader), data, datasize); // make space for resource header
+      ProgramHeader* header = (ProgramHeader*)(data+sizeof(ResourceHeader));
+      if(header->magic == 0XDADAC0DE){	
+	storage.writeResourceHeader(data, header->programName, datasize,
+				    RESOURCE_PORT_MAPPED|RESOURCE_USER_PATCH|slot);
+	program.saveToFlash(slot, data, datasize+sizeof(ResourceHeader));
+      }else{
+	error(PROGRAM_ERROR, "Invalid patch magic");
+      }
     }else{
       error(PROGRAM_ERROR, "Invalid STORE slot");
     }
   }else{
     error(PROGRAM_ERROR, "Invalid STORE command");
   }
+  loader.clear();
 }
 
 void MidiHandler::handleFirmwareSaveCommand(uint8_t* data, uint16_t size){
@@ -327,22 +350,11 @@ void MidiHandler::handleFirmwareSaveCommand(uint8_t* data, uint16_t size){
       // todo: create ResourceHeader in FirmwareLoader::beginFirmwareUpload()
       // stop patch or check if running
       // flash in background task
-      uint32_t slot;
-      ResourceHeader* res = registry.getResource(name);
-      if(res == NULL)
-	slot = registry.getNumberOfResources()+MAX_NUMBER_OF_PATCHES+1;
-      else
-	slot = registry.getSlot(res);
       data = loader.getData();
       size_t datasize = loader.getSize();
       memmove(data+sizeof(ResourceHeader), data, datasize); // make space for resource header
-      memset(data, 0, sizeof(ResourceHeader)); // zero fill header
-      res = (ResourceHeader*)data;
-      res->magic = 0xDADADEED;
-      res->size = datasize;
-      strcpy(res->name, name);
-      datasize += sizeof(ResourceHeader);
-      program.saveToFlash(slot, data, datasize);
+      storage.writeResourceHeader(data, name, datasize, RESOURCE_PORT_MAPPED);
+      program.saveToFlash(0, data, datasize+sizeof(ResourceHeader));
       loader.clear();
     }else{
       error(PROGRAM_ERROR, "Invalid SAVE name");
@@ -376,6 +388,9 @@ void MidiHandler::handleSysEx(uint8_t* data, uint16_t size){
     break;
   case SYSEX_FIRMWARE_STORE:
     handleFirmwareStoreCommand(data+4, size-5);
+    break;
+  case SYSEX_FIRMWARE_SEND:
+    handleFirmwareSendCommand(data+4, size-5);
     break;
   case SYSEX_FIRMWARE_FLASH:
     handleFirmwareFlashCommand(data+4, size-5);

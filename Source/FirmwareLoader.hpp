@@ -89,12 +89,14 @@ public:
     extern char _PATCHRAM;
     buffer = (uint8_t*)&_PATCHRAM; 
 #endif
+    packageIndex = 1;
     return 0;
   }
 
   int32_t receiveFirmwarePackage(uint8_t* data, uint16_t length, uint16_t offset){
     int len = sysex_to_data(data+offset, buffer+index, length-offset);
     index += len;
+    packageIndex++;
     return 0;
   }
 
@@ -116,7 +118,7 @@ public:
     offset += 5;
     if(idx == 0)
       return beginFirmwareUpload(data, length, offset);
-    if(++packageIndex != idx)
+    if(packageIndex != idx)
       return setError("SysEx package out of sequence"); // out of sequence package
     int len = floor((length-offset)*7/8.0f);
     // wait for program to exit before writing to buffer

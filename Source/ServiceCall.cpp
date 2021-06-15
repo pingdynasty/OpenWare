@@ -4,7 +4,7 @@
 #include "ServiceCall.h"
 #include "ApplicationSettings.h"
 #include "OpenWareMidiControl.h"
-#include "PatchRegistry.h"
+#include "Storage.h"
 #include "Owl.h"
 
 #ifdef USE_FFT_TABLES
@@ -137,24 +137,20 @@ static int handleLoadResource(void** params, int len){
     uint8_t** buffer = (uint8_t**)params[1];
     uint32_t offset = *(uint32_t*)params[2];
     uint32_t* max_size = (uint32_t*)params[3];
-    ResourceHeader* res = registry.getResource(name);
+    Resource* res = storage.getResourceByName(name);
     // We require offset to be aligned to 4 bytes
     if (res != NULL && !(offset & 0b11)) {
       if (*buffer == NULL) {
         // Buffer pointer not given, so we will update value refenced by max_size with
         // actual resource size here
-        *max_size = res->size - offset;
-        // TODO: this requires memory mapped access, so upcoming SPI NOR storage won't be able to set buffer ptr.
-        // e.g. if (storage.isMemoryMapped()) ...
-        *buffer = (uint8_t*)registry.getData(res) + offset;
-      }
-      else {
-	uint32_t copy_size = min(*max_size, res->size - offset);
+        *max_size = res->getDataSize() - offset;
+	if(res->isMemoryMapped())
+	  *buffer = (uint8_t*)res->getData() + offset;
+      }else{
+	uint32_t copy_size = min(*max_size, res->getDataSize() - offset);
         // Buffer pointer is given. We'll copy no more than max_size data into it.
-        memcpy(*buffer, ((uint8_t*)registry.getData(res) + offset), copy_size);
+	storage.readResource(res, *buffer, offset, copy_size);
 	*max_size = copy_size; // update max_size parameter with amount of data actually copied
-        // We'll need a separate method in registry class to handle copying (i.e. for non-memorymapped storages)
-        // e.g. storage.copyData(*buffer, *offset, *max_length);
       }
       ret = OWL_SERVICE_OK;
     }

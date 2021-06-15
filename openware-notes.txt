@@ -177,11 +177,11 @@ amidi -p hw:2 -S f07d527df7
 # reset to bootloader
 amidi -p hw:2 -S f07d527ef7
 
-# erase flash storage sectors 7-10
-amidi -p "hw:1,0,0" -S f07d52140000000007f7f07d52140000000008f7f07d52140000000009f7f07d5214000000000af7
+# erase flash storage
+amidi -p hw:2 -S f07d5214f7
 
-# erase patch storage
-amidi -p "hw:1,0,0" -S f07d5214f7
+# erase resource 40
+amidi -p hw:2 -S f07d52140000000028f7
 
 # flash Wizard firmware
 amidi -p hw:2 -s Wizard.syx
