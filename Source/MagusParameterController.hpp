@@ -768,29 +768,33 @@ public:
       default:
         break;
       }
-    }else{
+    }
+    else{
       if(controlMode == EXIT){
-	displayMode = STANDARD;
-	sensitivitySelected = false;
-	if(saveSettings)
-	  settings.saveToFlash();
-      }else{
-	int16_t delta = value - encoders[1];
-	if(delta > 0 && controlMode+1 < NOF_CONTROL_MODES){
-	  setControlMode(controlMode+1);
-	}else if(delta < 0 && controlMode > 0){
-	  setControlMode(controlMode-1);
-	}
-	if (controlMode == CALIBRATE) {
-	  if (continueCalibration)
-	    updateCalibration();
-	  else
-	    calibrationConfirm = false;
-	}
-  else if (controlMode == DATA && resourceDeletePressed) {
-    resourceDeletePressed = false;
-  }
-	encoders[1] = value;
+        displayMode = STANDARD;
+        //selectedBlock = 0;
+        sensitivitySelected = false;
+        if(saveSettings)
+          settings.saveToFlash();
+      }
+      else{
+        int16_t delta = value - encoders[1];
+        if(delta > 0 && controlMode+1 < NOF_CONTROL_MODES){
+          setControlMode(controlMode+1);
+        }
+        else if(delta < 0 && controlMode > 0){
+          setControlMode(controlMode-1);
+        }
+        if (controlMode == CALIBRATE) {
+          if (continueCalibration)
+            updateCalibration();
+          else
+            calibrationConfirm = false;
+        }
+        else if (controlMode == DATA && resourceDeletePressed) {
+          resourceDeletePressed = false;
+        }
+        encoders[1] = value;
       }
     }
   }
@@ -925,6 +929,7 @@ public:
 
     // update encoder 1 top right
     int16_t value = data[2];
+    int16_t right_enc = encoders[1]; // Save old value for encoder scrolling in main menu
     if(displayMode == CONTROL){
       selectControlMode(value, pressed&0x3); // action if either left or right encoder pushed
       if(pressed&0x3c) // exit status mode if any other encoder is pressed
@@ -958,24 +963,39 @@ public:
         // TODO: add 'special' parameters: Volume, Freq, Gain, Gate
         displayMode = SELECTGLOBALPARAMETER;
         int16_t delta = value - encoders[0];
+        selectedPid[0] = selectedPid[selectedBlock];
+        selectedBlock = 0;
         if(delta < 0) {
-          selectGlobalParameter(selectedPid[0]-1);
-        }
+          selectGlobalParameter(selectedPid[selectedBlock] - 1);
+      }
         else {
           if(delta > 0) {              
-            selectGlobalParameter(selectedPid[0]+1);
+            selectGlobalParameter(selectedPid[selectedBlock] + 1);
           }
-          selectedBlock = 0;
         }
       }
       else{
+        if (displayMode == STANDARD) {
+          // Quick selection of global parameter by right encoder - without popover menu
+          int16_t delta = data[2] - right_enc;
+          encoders[1] = data[2];
+          if(delta < 0) {
+            selectGlobalParameter(selectedPid[selectedBlock] - 1);
+            selectedBlock = 0;
+          }
+          else
+            if(delta > 0) {
+              selectGlobalParameter(selectedPid[selectedBlock] + 1);
+              selectedBlock = 0;
+            }
+        }
         if(encoders[0] != value){
-          selectedBlock = 0;
           encoders[0] = value;
           // We must update encoder value before calculating user value, otherwise
           // previous value would be displayed
           user[selectedPid[0]] = getEncoderValue(0);
         }
+
         if(displayMode == SELECTGLOBALPARAMETER)
           displayMode = STANDARD;
       }
@@ -996,18 +1016,18 @@ public:
             if(delta > 0)
               selectBlockParameter(i, selectedPid[i]+1);
           }
-	else{
-	  if(encoders[i] != value){
-	    selectedBlock = i;
-	    encoders[i] = value;
-	    // We must update encoder value before calculating user value, otherwise
-	    // previous value would be displayed
-	    user[selectedPid[i]] = getEncoderValue(i);
-	  }
-	  if(displayMode == SELECTBLOCKPARAMETER && selectedBlock == i)
-	    displayMode = STANDARD;
-	}
-	encoders[i] = value;
+        else{
+          if(encoders[i] != value){
+            selectedBlock = i;
+            encoders[i] = value;
+            // We must update encoder value before calculating user value, otherwise
+            // previous value would be displayed
+            user[selectedPid[i]] = getEncoderValue(i);
+          }
+          if(displayMode == SELECTBLOCKPARAMETER && selectedBlock == i)
+            displayMode = STANDARD;
+        }
+        encoders[i] = value;
       }
       if(displayMode == STANDARD && getErrorStatus() && getErrorMessage() != NULL)
         displayMode = ERROR;    
